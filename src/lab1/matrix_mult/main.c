@@ -53,6 +53,7 @@ int diff(float *A, float *B, int hA, int wA, int wB, float *C)
 				return(0);
 			}
 
+	free(C_cpu);
 
 	return(1);
 
@@ -108,6 +109,10 @@ int main(int argc, char** argv)
 	//printf("\n\nMATRIX A\n");print_matrix(A, hA, wA);
 	//printf("\n\nMATRIX B\n");print_matrix(B, hB, wB);
 	//printf("\n\nMATRIX C\n");print_matrix(C, hA, wB);
+
+	free(A);
+	free(B);
+	free(C);
 
 	return (1);
 }
