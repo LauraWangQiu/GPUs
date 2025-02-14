@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <sys/time.h>
+#include <math.h>
 #include "matrix_mul.h"
 
 // Thread block size
@@ -48,7 +49,8 @@ void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 	// Compute the execution configuration assuming
 	// the matrix dimensions are multiples of BLOCK_SIZE
 	dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
-	dim3 dimGrid(wB / dimBlock.x, hA / dimBlock.y);
+	dim3 dimGrid(ceil((float)wB / dimBlock.x), ceil((float)hA / dimBlock.y));
+	printf("Num %d %d\n", dimGrid.x, dimGrid.y);
 	gettimeofday(&init,NULL);
 	// Launch the device computation
 #ifdef VERSION_1
@@ -99,13 +101,17 @@ __global__ void Muld(float* A, float* B, int wA, int wB, int hA, float* C)
 	}
 #elif defined VERSION_2
 	// Version 2
-	int i = threadIdx.x + blockIdx.x * blockDim.x;
-	int j = threadIdx.y + blockIdx.y * blockDim.y;
-	float accum = 0.0f;
-	for (int k = 0; k < wA; ++k) {
-		accum += A[i * wA + k] * B[k * wB + j];
+	int i = threadIdx.x + blockIdx.x * blockDim.x; // Componente X
+	int j = threadIdx.y + blockIdx.y * blockDim.y; // Componente Y
+	if (j < hA && i < wB) {
+		float accum = 0.0f;
+		for (int k = 0; k < wA; ++k) {
+			// j * wA = salto de fila
+			// k * wB = salto de columna
+			accum += A[j * wA + k] * B[k * wB + i];
+		}
+		C[j * wB + i] = accum;
 	}
-	C[i * wB + j] = accum;
 #endif
 }
 
