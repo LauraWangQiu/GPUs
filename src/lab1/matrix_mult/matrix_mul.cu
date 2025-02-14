@@ -3,7 +3,13 @@
 #include "matrix_mul.h"
 
 // Thread block size
-#define BLOCK_SIZE 16 
+#define BLOCK_SIZE 16
+
+#define TIMEVAL_TO_SECONDS(timeval) timeval.tv_sec + timeval.tv_usec * 1E-6
+#define TIME_DIFF_SECONDS(timeval1, timeval2) TIMEVAL_TO_SECONDS(timeval1) - TIMEVAL_TO_SECONDS(timeval2)
+#define FLOPS(m, n, k) 2 * m * n * k
+
+#define VERSION_2
 
 // Forward declaration of the device multiplication function
 __global__ void Muld(float*, float*, int, int, int, float*);
@@ -14,69 +20,62 @@ __global__ void Muld(float*, float*, int, int, int, float*);
 // wA is the width of A
 // wB is the width of B
 
-
 void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 {
-	int size;
-
 	// Load A and B to the device
 	float* Ad;
-	size = hA * wA * sizeof(float);
-
+	int sizeA = hA * wA * sizeof(float);
 	struct timeval init, end;
 	gettimeofday(&init,NULL);
-
-	cudaMalloc((void**)&Ad, size);
-	cudaMemcpy(Ad, A, size, cudaMemcpyHostToDevice);
-
+	cudaMalloc((void**)&Ad, sizeA);
+	cudaMemcpy(Ad, A, sizeA, cudaMemcpyHostToDevice);
 	gettimeofday(&end,NULL);
-
-	printf("Time A: %ld ms\n", end.tv_usec - init.tv_usec);
+	double tt1 = TIME_DIFF_SECONDS(end, init);
 
 	float* Bd;
-	size = wA * wB * sizeof(float);
-
+	int sizeB = wA * wB * sizeof(float);
 	gettimeofday(&init,NULL);
-
-	cudaMalloc((void**)&Bd, size);
-	cudaMemcpy(Bd, B, size, cudaMemcpyHostToDevice);
-
+	cudaMalloc((void**)&Bd, sizeB);
+	cudaMemcpy(Bd, B, sizeB, cudaMemcpyHostToDevice);
 	gettimeofday(&end,NULL);
-
-	printf("Time B: %ld ms\n", end.tv_usec - init.tv_usec);
+	double tt2 = TIME_DIFF_SECONDS(end, init);
 
 	// Allocate C on the device
 	float* Cd;
-	size = hA * wB * sizeof(float);
-	cudaMalloc((void**)&Cd, size);
+	int sizeC = hA * wB * sizeof(float);
+	cudaMalloc((void**)&Cd, sizeC);
 
-	// // Compute the execution configuration assuming
-	// // the matrix dimensions are multiples of BLOCK_SIZE
-	// dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
-	// dim3 dimGrid(wB / dimBlock.x, hA / dimBlock.y);
-
+	// Compute the execution configuration assuming
+	// the matrix dimensions are multiples of BLOCK_SIZE
+	dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
+	dim3 dimGrid(wB / dimBlock.x, hA / dimBlock.y);
 	gettimeofday(&init,NULL);
-
-	// // Launch the device computation
-	// Muld<<<dimGrid, dimBlock>>>(Ad, Bd, wA, wB, hA, Cd);
-	Muld<<<1, 1>>>(Ad, Bd, wA, wB, hA, Cd); // Funcion asincrona
+	// Launch the device computation
+#ifdef VERSION_1
+	// Version 1
+	Muld<<<1, 1>>>(Ad, Bd, wA, wB, hA, Cd);
+#elif defined VERSION_2
+	// Version 2
+	Muld<<<dimGrid, dimBlock>>>(Ad, Bd, wA, wB, hA, Cd);
+#endif
 	cudaDeviceSynchronize(); // Bloquear
-
 	gettimeofday(&end,NULL);
-
-	//suseconds_t bandWidth = 
-	printf("Time Muld: %ld ms\n", end.tv_usec - init.tv_usec);
+	double tkernel = TIME_DIFF_SECONDS(end, init);
 
 	gettimeofday(&init,NULL);
-
 	// Read C from the device
-	cudaMemcpy(C, Cd, size, cudaMemcpyDeviceToHost);
-
+	cudaMemcpy(C, Cd, sizeC, cudaMemcpyDeviceToHost);
 	gettimeofday(&end,NULL);
+	double tt3 = TIME_DIFF_SECONDS(end, init);
 
-	printf("Time cudaMemcpyDeviceToHost (C): %ld ms\n", end.tv_usec - init.tv_usec);
-
-
+	printf("Time A (malloc and memcpy): %lf s\n", tt1);
+	printf("Time B (malloc and memcpy): %lf s\n", tt2);
+	printf("Time Kernel: %lf s\n", tkernel);
+	printf("Time C (cudaMemcpyDeviceToHost): %lf s\n", tt3);
+	printf("Band width of A: %lf KB/s\n", sizeA * 1E-3/tt1);
+	printf("Band width of B: %lf KB/s\n", sizeB * 1E-3/tt2);
+	printf("Performance Kernel: %lf GFLOPS/s\n", FLOPS(hA, wB, wA) * 1E-9/tkernel);
+	printf("Band width of C: %lf KB/s\n", sizeC * 1E-3/tt3);
 
 	// Free device memory
 	cudaFree(Ad);
@@ -84,16 +83,30 @@ void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 	cudaFree(Cd);
 }
 
+// Funcion asincrona
 __global__ void Muld(float* A, float* B, int wA, int wB, int hA, float* C)
 {
+#ifdef VERSION_1
+	// Version 1
 	for (int i = 0; i < hA; ++i) {
 		for (int j = 0; j < wB; ++j) {
-			C[i * wB + j] = 0.0f;
+			float accum = 0.0f;
 			for (int k = 0; k < wA; ++k) {
-				C[i * wB + j] += A[i * wA + k] * B[k * wB + j];
+				accum += A[i * wA + k] * B[k * wB + j];
 			}
+			C[i * wB + j] = accum;
 		}
 	}
+#elif defined VERSION_2
+	// Version 2
+	int i = threadIdx.x + blockIdx.x * blockDim.x;
+	int j = threadIdx.y + blockIdx.y * blockDim.y;
+	float accum = 0.0f;
+	for (int k = 0; k < wA; ++k) {
+		accum += A[i * wA + k] * B[k * wB + j];
+	}
+	C[i * wB + j] = accum;
+#endif
 }
 
 #if 0

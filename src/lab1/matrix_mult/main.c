@@ -21,7 +21,7 @@ void print_matrix(float *M, int hM, int wM)
 	int i,j;
 
 	for (i=0; i<hM; i++){
-//		printf("Line %i: ", i);
+		//printf("Line %i: ", i);
 		for (j=0; j<wM; j++)
 			printf("%4.1f ", M[i*wM+j]);
 		printf("\n");
@@ -103,7 +103,6 @@ int main(int argc, char** argv)
 
 	if (!diff(A, B, hA, wA, wB, C))
 		printf("ERROR=GPU.vs.CPU matrix mult differs\n");
-	
 
 	// print Matrix
 	//printf("\n\nMATRIX A\n");print_matrix(A, hA, wA);
