@@ -1,4 +1,4 @@
-CC = nvcc 
+CC = /opt/nvidia/hpc_sdk/Linux_x86_64/2024/compilers/bin/nvcc
 
 EXE   = transpose 
 
@@ -14,10 +14,10 @@ LIBS = -lm
 SOURCEDIR = .
 
 $(EXE) :$(OBJS) 
-	$(CC) $(CFLAGS)  -o $@ $? $(LIBS)
+	$(CC) $(CFLAGS) -allow-unsupported-compiler -o $@ $? $(LIBS)
 
 $(SOURCEDIR)/%.o : $(SOURCEDIR)/%.cu
-	$(CC) $(CFLAGS) -c -o $@ $<
+	$(CC) $(CFLAGS) -allow-unsupported-compiler -c -o $@ $<
 
 
 clean:
