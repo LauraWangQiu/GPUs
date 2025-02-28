@@ -3,6 +3,7 @@
 #include <math.h>
 
 #include "routinesCPU.h"
+#include "png_io.h"
 
 #define DEG2RAD 0.017453f
 
@@ -265,12 +266,15 @@ void lane_assist_CPU(uint8_t *im, int height, int width,
 		1000.0f, //level
 		height, width);
 
+	write_png_fileBW("out_edge.png", imEdge, width, height);
+
 	/* hough transform */
 	houghtransform(imEdge, width, height, accum, accu_width, accu_height, sin_table, cos_table);
 
+	write_png_fileBW("out_houghtransform.png", imEdge, width, height);
+
 	if (width>height) threshold = width/6;
 	else threshold = height/6;
-
 
 	getlines(threshold, accum, accu_width, accu_height, width, height, 
 		sin_table, cos_table,

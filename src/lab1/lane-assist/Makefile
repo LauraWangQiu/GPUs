@@ -1,7 +1,7 @@
 
 CXX = g++
 CC = gcc
-NVCC = nvcc
+NVCC = /opt/nvidia/hpc_sdk/Linux_x86_64/2024/compilers/bin/nvcc
 
 #OpenCV
 CXX_OPENCV_FLAGS+=`pkg-config opencv --cflags`
@@ -19,7 +19,7 @@ SRC = png_io.o routinesCPU.o routinesGPU.o main.o
 	$(CC) $(CFLAGS) -c -o $@ $<
 
 %.o: %.cu
-	$(NVCC) $(CFLAGS) -c -o $@ $<
+	$(NVCC) -allow-unsupported-compiler $(CFLAGS) -c -o $@ $<
 
 
 %.o: %.cpp
