@@ -17,7 +17,7 @@
 __global__ void Muld(float*, float*, int, int, int, float*);
 #elif defined VERSION_3
 // Forward declaration of the device multiplication function
-__global__ void Muld(float*, float*, int, int, float*);
+__global__ void Muld(float*, float*, int, int, int, float*);
 #endif
 
 // Host multiplication function
@@ -25,7 +25,6 @@ __global__ void Muld(float*, float*, int, int, float*);
 // hA is the height of A
 // wA is the width of A
 // wB is the width of B
-
 void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 {
 	// Load A and B to the device
@@ -39,7 +38,7 @@ void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 	double tt1 = TIME_DIFF_SECONDS(end, init);
 
 	float* Bd;
-	int sizeB = wA * wB * sizeof(float);
+	int sizeB = /*hB*/wA * wB * sizeof(float);
 	gettimeofday(&init,NULL);
 	cudaMalloc((void**)&Bd, sizeB);
 	cudaMemcpy(Bd, B, sizeB, cudaMemcpyHostToDevice);
@@ -55,7 +54,6 @@ void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 	// the matrix dimensions are multiples of BLOCK_SIZE
 	dim3 dimBlock(BLOCK_SIZE, BLOCK_SIZE);
 	dim3 dimGrid(ceil((float)wB / dimBlock.x), ceil((float)hA / dimBlock.y));
-	printf("Num %d %d\n", dimGrid.x, dimGrid.y);
 	gettimeofday(&init,NULL);
 	// Launch the device computation
 #ifdef VERSION_1
@@ -66,7 +64,7 @@ void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 	Muld<<<dimGrid, dimBlock>>>(Ad, Bd, wA, wB, hA, Cd);
 #elif defined VERSION_3
 	// Version 3: using shared memory
-	Muld<<<dimGrid, dimBlock>>>(Ad, Bd, wA, wB, Cd);
+	Muld<<<dimGrid, dimBlock>>>(Ad, Bd, hA, wA, wB, Cd);
 #endif
 	cudaDeviceSynchronize(); // Bloquear
 	gettimeofday(&end,NULL);
@@ -126,9 +124,10 @@ __global__ void Muld(float* A, float* B, int wA, int wB, int hA, float* C)
 #elif defined VERSION_3
 // Device multiplication function called by Mul()
 // Compute C = A * B
-// wA is the width of A
+// hA is the height of A
+// wA is the width of A and the height of B
 // wB is the width of B
-__global__ void Muld(float* A, float* B, int wA, int wB, float* C)
+__global__ void Muld(float* A, float* B, int hA, int wA, int wB, float* C)
 {
 	// Block index
 	int bx = blockIdx.x;
@@ -142,7 +141,7 @@ __global__ void Muld(float* A, float* B, int wA, int wB, float* C)
 	int aBegin = BLOCK_SIZE * wA * by;
 
 	// Index of the last sub-matrix of A processed by the block
-	int aEnd = aBegin + wA - BLOCK_SIZE;
+	int aEnd = aBegin + wA - 1;
 
 	// Step size used to iterate through the sub-matrices of A
 	int aStep = BLOCK_SIZE;
@@ -168,8 +167,20 @@ __global__ void Muld(float* A, float* B, int wA, int wB, float* C)
 
 		// Load the matrices from global memory to shared memory;
 		// each thread loads one element of each matrix
-		As[ty][tx] = A[a + ty * wA + tx];
-		Bs[ty][tx] = B[b + ty * wB + tx];
+		// As[ty][tx] = A[a + ty * wA + tx];
+		// Bs[ty][tx] = B[b + ty * wB + tx];
+		// If is not out of bounds, load the element
+		// If is out of bounds, load 0
+		if (a + ty * wA + tx < wA * hA)
+            As[ty][tx] = A[a + ty * wA + tx];
+        else
+            As[ty][tx] = 0.0;
+
+        if (b + ty * wB + tx < wB * wA /*hB*/)
+            Bs[ty][tx] = B[b + ty * wB + tx];
+        else
+            Bs[ty][tx] = 0.0;
+
 		// Synchronize to make sure the matrices are loaded
 		__syncthreads();
 
@@ -187,6 +198,11 @@ __global__ void Muld(float* A, float* B, int wA, int wB, float* C)
 	
 	// Write the block sub-matrix to global memory;
 	// each thread writes one element
-	C[(ty + by * blockDim.y) * wB + (tx + bx * blockDim.x)] = Csub;
+	// C[(ty + by * blockDim.y) * wB + (tx + bx * blockDim.x)] = Csub;
+	// If is not out of bounds, write the result
+	int row = ty + by * blockDim.y;
+	int col = tx + bx * blockDim.x;
+	if (row < hA && col < wB)
+		C[row * wB + col] = Csub;
 }
 #endif
