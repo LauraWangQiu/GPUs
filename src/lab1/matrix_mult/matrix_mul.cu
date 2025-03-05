@@ -76,14 +76,15 @@ void Mul___(float* A, float* B, int hA, int wA, int wB, float* C)
 	gettimeofday(&end,NULL);
 	double tt3 = TIME_DIFF_SECONDS(end, init);
 
+	printf("GPU:\n");
 	printf("Time A (malloc and memcpy): %lf s\n", tt1);
 	printf("Time B (malloc and memcpy): %lf s\n", tt2);
 	printf("Time Kernel: %lf s\n", tkernel);
 	printf("Time C (cudaMemcpyDeviceToHost): %lf s\n", tt3);
-	printf("Band width of A: %lf KB/s\n", sizeA * 1E-3/tt1);
-	printf("Band width of B: %lf KB/s\n", sizeB * 1E-3/tt2);
+	printf("Bandwidth of A: %lf KB/s\n", sizeA * 1E-3/tt1);
+	printf("Bandwidth of B: %lf KB/s\n", sizeB * 1E-3/tt2);
 	printf("Performance Kernel: %lf GFLOPS/s\n", FLOPS(hA, wB, wA) * 1E-9/tkernel);
-	printf("Band width of C: %lf KB/s\n", sizeC * 1E-3/tt3);
+	printf("Bandwidth of C: %lf KB/s\n", sizeC * 1E-3/tt3);
 
 	// Free device memory
 	cudaFree(Ad);

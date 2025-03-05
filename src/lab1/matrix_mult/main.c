@@ -2,7 +2,11 @@
 #include <malloc.h>
 #include <stdlib.h>
 #include <math.h>
+#include <sys/time.h>
 #include "matrix_mul.h"
+
+#define TIMEVAL_TO_SECONDS(timeval) timeval.tv_sec + timeval.tv_usec * 1E-6
+#define TIME_DIFF_SECONDS(timeval1, timeval2) TIMEVAL_TO_SECONDS(timeval1) - TIMEVAL_TO_SECONDS(timeval2)
 
 void init_matrix(float *M, int hM, int wM, float k)
 {
@@ -28,7 +32,7 @@ void print_matrix(float *M, int hM, int wM)
 	}
 }
 
-int diff(float *A, float *B, int hA, int wA, int wB, float *C)
+int diff(float *A, float *B, int hA, int wA, int wB, float *C, double *tcpu)
 {
 	float *C_cpu;
 	int size_C = wB * hA;
@@ -36,6 +40,8 @@ int diff(float *A, float *B, int hA, int wA, int wB, float *C)
 
 	int i,j,k;
 
+	struct timeval init, end;
+	gettimeofday(&init,NULL);
 	for (i=0; i<hA; i++)
 		for (j=0; j<wB; j++){
 			C_cpu[i*wB+j] = 0.0;
@@ -43,6 +49,8 @@ int diff(float *A, float *B, int hA, int wA, int wB, float *C)
 				C_cpu[i*wB+j] += A[i*wA+k]*B[k*wB+j];
 			}
 		}
+	gettimeofday(&end,NULL);
+	*tcpu = TIME_DIFF_SECONDS(end, init);
 	//printf("\n\nMATRIX C_cpu\n");print_matrix(C_cpu, hA, wB);
 
 	for (i=0; i<hA; i++)
@@ -82,32 +90,45 @@ int main(int argc, char** argv)
 
 	// Init A and B, malloc C
 	int size_A = wA * hA;
+
+	struct timeval init, end;
+	gettimeofday(&init,NULL);
 	A = (float*)malloc(size_A*sizeof(float));
 	init_matrix(A, hA, wA, 1.0);
+	gettimeofday(&end,NULL);
+	double tt1 = TIME_DIFF_SECONDS(end, init);
 
 	int size_B = wB * hB;
+	gettimeofday(&init,NULL);
 	B = (float*)malloc(size_B*sizeof(float));
 	init_matrix(B, hB, wB, 2.0);
+	gettimeofday(&end,NULL);
+	double tt2 = TIME_DIFF_SECONDS(end, init);
 
 	int size_C = wB * hA;
 	C = (float*)malloc(size_C*sizeof(float));
 	for (i = 0; i < (hA*wB); i++) {
 		C[i] = 0.0;
 	}
-
-
+	
 	Mul___(A, B, hA, wA, wB, C);
 	//printf("\n\nMATRIX A\n");print_matrix(A, hA, wA);
 	//printf("\n\nMATRIX B\n");print_matrix(B, hB, wB);
 	//printf("\n\nMATRIX C\n");print_matrix(C, hA, wB);
 
-	if (!diff(A, B, hA, wA, wB, C))
+	double tcpu;
+	if (!diff(A, B, hA, wA, wB, C, &tcpu))
 		printf("ERROR=GPU.vs.CPU matrix mult differs\n");
 
 	// print Matrix
 	//printf("\n\nMATRIX A\n");print_matrix(A, hA, wA);
 	//printf("\n\nMATRIX B\n");print_matrix(B, hB, wB);
 	//printf("\n\nMATRIX C\n");print_matrix(C, hA, wB);
+
+	printf("CPU:\n");
+	printf("Time A (malloc and init_matrix): %lf s\n", tt1);
+	printf("Time B (malloc and init_matrix): %lf s\n", tt2);
+	printf("Time CPU: %lf s\n", tcpu);
 
 	free(A);
 	free(B);
