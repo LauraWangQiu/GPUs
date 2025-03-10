@@ -70,18 +70,18 @@ Leer más en: [Thread block](https://en.wikipedia.org/wiki/Thread_block_(CUDA_pr
 __global__ void transpose_device(float *in, float *out, int rows, int cols) 
 { 
     int i, j; 
-    __shared__ float tile [ TILE_DIM ] [ TILE_DIM ]; 
+	__shared__ float tile [ TILE_DIM ] [ TILE_DIM ]; 
 
-    i = blockIdx.x * blockDim.x + threadIdx.x; 
-    j = blockIdx.y * blockDim.y + threadIdx.y; 
+	i = blockIdx.x * blockDim.x + threadIdx.x; 
+	j = blockIdx.y * blockDim.y + threadIdx.y; 
 
-    if (i<rows && j<cols) {
-        tile[j] [i] = in[ j * cols + i ];
-        __syncthreads(); 
-        i = threadIdx.x;
-        j = threadIdx.y;
-        out[ i * rows + j ] = tile[j][i];
-    }
+	if (i<rows && j<cols) {
+		tile[threadIdx.y] [threadIdx.x] = in[ j * cols + i ];
+		__syncthreads(); 
+		i = blockIdx.x * TILE_DIM + threadIdx.y;
+		j = blockIdx.y * TILE_DIM + threadIdx.x; 
+		out[ i * rows + j ] = tile[threadIdx.x] [threadIdx.y];
+	}
 }
 ```
 
@@ -96,17 +96,19 @@ Usamos memoria compartida para almacenar los elementos de la matriz de entrada a
 __global__ void transpose_device(float *in, float *out, int rows, int cols) 
 { 
     int i, j; 
-    __shared__ float tile [ TILE_DIM ] [ TILE_DIM+1 ]; 
+	__shared__ float tile [ TILE_DIM ] [ TILE_DIM+1 ]; 
 
-    i = blockIdx.x * blockDim.x + threadIdx.x; 
-    j = blockIdx.y * blockDim.y + threadIdx.y; 
+	i = blockIdx.x * blockDim.x + threadIdx.x; 
+	j = blockIdx.y * blockDim.y + threadIdx.y; 
 
-    if (i<rows && j<cols) {
-        tile[threadIdx.y] [threadIdx.x] = in[ j * cols + i ];
-        __syncthreads(); 
-        i = blockIdx.y * blockDim.y + threadIdx.x;
-        j = blockIdx.x * blockDim.x + threadIdx.y;
-        out[ i * rows + j ] = tile[threadIdx.x][threadIdx.y];
-    }
+	if (i<rows && j<cols) {
+		tile[threadIdx.y] [threadIdx.x] = in[ j * cols + i ];
+		__syncthreads(); 
+		i = blockIdx.x * TILE_DIM + threadIdx.y;
+		j = blockIdx.y * TILE_DIM + threadIdx.x; 
+		out[ i * rows + j ] = tile[threadIdx.x] [threadIdx.y];
+	}
 }
 ```
+
+Añadimos padding para evitar el bank conflict en la memoria compartida. El bank conflict ocurre cuando dos o más hilos intentan acceder a la misma ubicación de memoria compartida. En este caso, los accesos a la memoria compartida se dividen en bancos de 32 bits, y si dos o más hilos intentan acceder a la misma ubicación de memoria compartida, se produce un conflicto de bancos.

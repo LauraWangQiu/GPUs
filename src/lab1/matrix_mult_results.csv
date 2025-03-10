@@ -1,0 +1,1 @@
+hA,wA/hB,wB,Time A (malloc and memcpy),Time B (malloc and memcpy),Time Kernel,Time A (malloc and init_matrix),Time B (malloc and init_matrix),Time CPU

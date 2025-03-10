@@ -9,11 +9,7 @@ filenamePNGall = 'matrix_mult_results_all.png'
 # Define the range of values
 # start = 1
 # end = 64
-values = [
-    (4096, 1024, 2048),
-    (1024, 1024, 1024),
-    (8192, 512, 4096)
-]
+values = [(i, i, i) for i in [512, 1024, 2048, 4096]]
 
 # Open the CSV file for writing
 with open(filenameCSV, mode='w', newline='') as file:

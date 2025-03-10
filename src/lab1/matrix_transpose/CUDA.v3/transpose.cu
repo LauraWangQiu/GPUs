@@ -85,9 +85,9 @@ __global__ void transpose_device(float *in, float *out, int rows, int cols)
 	if (i<rows && j<cols) {
 		tile[threadIdx.y] [threadIdx.x] = in[ j * cols + i ];
 		__syncthreads(); 
-		// i = ; 
-		// j = ; 
-		out[ i * rows + j ] = tile[threadIdx.y] [threadIdx.x];
+		i = blockIdx.x * TILE_DIM + threadIdx.y;
+		j = blockIdx.y * TILE_DIM + threadIdx.x; 
+		out[ i * rows + j ] = tile[threadIdx.x] [threadIdx.y];
 	}
 }
 
