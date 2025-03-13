@@ -16,10 +16,12 @@
 ## Profiler
 
 ```bash
-# Recolectar profiling
-ncu -o profile --set full ./transpose
+# Perfilar
+nsys nvprof ./transpose
 # Visualización de la traza
 ncu-ui report.nsys-rep
+# Recolectar profiling
+ncu -o profile --set full ./transpose
 ```
 
 ## CUDA.v1
