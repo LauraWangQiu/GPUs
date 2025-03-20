@@ -1,6 +1,6 @@
 CXX=icpx
-CXXFLAGS=-fsycl -I.
-CXXFLAGS=-fsycl -fsycl-targets=nvptx64-nvidia-cuda -I.
+# CXXFLAGS=-fsycl -I.
+CXXFLAGS=-fsycl -fsycl-targets=nvptx64-nvidia-cuda -I. # Specify the default_selector
 LIBS=
 
 %.o: %.cpp $(DEPS)
