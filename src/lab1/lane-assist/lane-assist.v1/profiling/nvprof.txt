@@ -1,0 +1,36 @@
+==36643== NVPROF is profiling process 36643, command: ./image img0.png g
+==36643== Warning: Unified Memory Profiling is not supported on the current configuration because a pair of devices without peer-to-peer support is detected on this multi-GPU setup. When peer mappings are not available, system falls back to using zero-copy memory. It can cause kernels, which access unified memory, to run slower. More details can be found at: http://docs.nvidia.com/cuda/cuda-c-programming-guide/index.html#um-managed-memory
+GPU Exection time 596161.000000 ms.
+(x1,y1)=(0,1163) (x2,y2)=(768,625)
+(x1,y1)=(0,770) (x2,y2)=(768,593)
+(x1,y1)=(960,644) (x2,y2)=(1920,1176)
+==36643== Profiling application: ./image img0.png g
+==36643== Warning: 24 API trace records have same start and end timestamps.
+This can happen because of short execution duration of CUDA APIs and low timer resolution on the underlying operating system.
+==36643== Profiling result:
+            Type  Time(%)      Time     Calls       Avg       Min       Max  Name
+ GPU activities:   33.33%  2.8784ms         1  2.8784ms  2.8784ms  2.8784ms  gradient_kernel(float*, float*, float*, float*, float*, int, int)
+                   23.84%  2.0586ms         1  2.0586ms  2.0586ms  2.0586ms  noiseReduction_kernel(unsigned char*, float*, int, int)
+                   12.93%  1.1162ms         8  139.53us     779ns  710.77us  [CUDA memcpy DtoH]
+                   11.03%  952.77us         1  952.77us  952.77us  952.77us  [CUDA memcpy HtoD]
+                   10.53%  909.42us         1  909.42us  909.42us  909.42us  hough_kernel(unsigned char*, int, int, unsigned int*, int, int, float*, float*, float, float, float)
+                    2.81%  242.74us         1  242.74us  242.74us  242.74us  image_RGB2BW_kernel(unsigned char*, unsigned char*, int, int)
+                    2.16%  186.89us         1  186.89us  186.89us  186.89us  edge_kernel(float*, float*, unsigned char*, int, int)
+                    1.95%  168.04us         1  168.04us  168.04us  168.04us  draw_lines_kernel(unsigned char*, int, int, int*, int*, int*, int*, int, int)
+                    1.08%  93.658us         1  93.658us  93.658us  93.658us  thresholding_kernel(unsigned char*, unsigned char*, float*, unsigned char*, float, int, int)
+                    0.22%  18.919us         1  18.919us  18.919us  18.919us  getlines_kernel(int, unsigned int*, int, int, int, int, float*, float*, int*, int*, int*, int*, int*)
+                    0.09%  7.9830us         2  3.9910us     973ns  7.0100us  [CUDA memset]
+                    0.02%  1.4280us         1  1.4280us  1.4280us  1.4280us  init_cos_sin_table_kernel(float*, float*, int)
+      API calls:   93.94%  287.95ms        17  16.938ms  1.9290us  283.87ms  cudaMalloc
+                    3.75%  11.489ms         9  1.2766ms  53.499us  5.5795ms  cudaMemcpy
+                    0.80%  2.4503ms         9  272.25us  8.8320us  2.3293ms  cudaLaunchKernel
+                    0.78%  2.3945ms         2  1.1972ms  33.196us  2.3613ms  cudaMemset
+                    0.72%  2.2121ms        17  130.13us  1.8270us  275.82us  cudaFree
+                    0.01%  18.981us       114     166ns       0ns  4.8730us  cuDeviceGetAttribute
+                    0.00%  2.6400us         1  2.6400us  2.6400us  2.6400us  cuDeviceGetPCIBusId
+                    0.00%  1.3200us         3     440ns     102ns     812ns  cuDeviceGetCount
+                    0.00%  1.0150us         1  1.0150us  1.0150us  1.0150us  cuDeviceGetName
+                    0.00%     813ns         2     406ns     102ns     711ns  cuDeviceGet
+                    0.00%     609ns         1     609ns     609ns     609ns  cuDeviceTotalMem
+                    0.00%     203ns         1     203ns     203ns     203ns  cuModuleGetLoadingMode
+                    0.00%     101ns         1     101ns     101ns     101ns  cuDeviceGetUuid
