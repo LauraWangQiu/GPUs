@@ -194,12 +194,11 @@ void buble_sort(float array[], int size)
 				tmp = array[j];
 				array[j] = array[j + 1];
 				array[j + 1] = tmp;
-				// std::swap(array[j], array[j+1]);
 			}
 }
 
 void remove_noise(float *im, float *image_out,
-				  float thredshold, int window_size,
+				  float threshold, int window_size,
 				  int height, int width)
 {
 	int i, j, ii, jj;
@@ -219,7 +218,7 @@ void remove_noise(float *im, float *image_out,
 			buble_sort(window, window_size * window_size);
 			median = window[(window_size * window_size - 1) >> 1];
 
-			if (fabsf((median - im[i * width + j]) / median) <= thredshold)
+			if (fabsf((median - im[i * width + j]) / median) <= threshold)
 				image_out[i * width + j] = im[i * width + j];
 			else
 				image_out[i * width + j] = median;
