@@ -1,7 +1,7 @@
 /*
     This file is part of the example codes which have been used
     for the "Code Optmization Workshop".
-    
+
     Copyright (C) 2016  Fabio Baruffa <fbaru-dev@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
@@ -21,30 +21,27 @@
 #ifndef _CPUTIME_HPP
 #define _CPUTIME_HPP
 
+#include <sys/resource.h>
 #include <sys/time.h>
 #include <sys/types.h>
-#include <sys/resource.h>
 
 // Return number of microseconds since 1.1.1970, in a 64 bit integer.
-
 class CPUTime {
 private:
-    double wctime;
-    
-    inline double readTime() 
-    {
-      struct timeval tp;
+  double wctime;
 
-      gettimeofday(&tp,NULL);
-      wctime = (double) tp.tv_sec + (double) tp.tv_usec * 1.e-6;
-      return wctime;
-    }
+  inline double readTime() {
+    struct timeval tp;
+
+    gettimeofday(&tp, NULL);
+    wctime = (double)tp.tv_sec + (double)tp.tv_usec * 1.e-6;
+    return wctime;
+  }
+
 public:
-    CPUTime() : wctime(0.0) { }
-        
-    inline double start() { return readTime(); }
-    inline double stop()  { return readTime(); }
-    
-};
+  CPUTime() : wctime(0.0) {}
 
+  inline double start() { return readTime(); }
+  inline double stop()  { return readTime(); }
+};
 #endif

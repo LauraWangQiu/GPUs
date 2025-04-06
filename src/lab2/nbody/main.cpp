@@ -1,7 +1,7 @@
 /*
     This file is part of the example codes which have been used
     for the "Code Optmization Workshop".
-    
+
     Copyright (C) 2016  Fabio Baruffa <fbaru-dev@gmail.com>
 
     This program is free software: you can redistribute it and/or modify
@@ -22,24 +22,21 @@
 
 #include "GSimulation.hpp"
 
-int main(int argc, char** argv) 
-{
-  int N;			//number of particles
-  int nstep; 		//number ot integration steps
-  
+int main(int argc, char **argv) {
+  int N;     // number of particles
+  int nstep; // number ot integration steps
+
   GSimulation sim;
-    
-  if(argc>1)
-  {
-    N=atoi(argv[1]);
-    sim.set_number_of_particles(N);  
-    if(argc==3) 
-    {
-      nstep=atoi(argv[2]);
-      sim.set_number_of_steps(nstep);  
+
+  if (argc > 1) {
+    N = atoi(argv[1]);
+    sim.set_number_of_particles(N);
+    if (argc == 3) {
+      nstep = atoi(argv[2]);
+      sim.set_number_of_steps(nstep);
     }
   }
-  
+
   sim.start();
 
   return 0;

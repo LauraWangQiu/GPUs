@@ -592,7 +592,7 @@ $F_{i,j} = \frac{G m_i m_j \left( {q_j-q_i} \right)}{\left\| q_j-q_i  \right \| 
 $m_i \frac{\partial^2 q_i}{\partial^2 t} = \sum_{j=0,i \neq j}^{N}{\frac{G m_i m_j \left( {q_j-q_i} \right)} {\left\| q_j-q_i  \right \| ^3}} = \frac{\partial U}{\partial q_i}$
 
 * En el fichero **GSimulation.cpp** está el bucle principal en la función **start()**
-    * Funciones principales **get_forces** y **updateParticles**
+    * Funciones principales **get_acceleration** y **updateParticles**
 
 ```c
 void GSimulation :: start() 
@@ -603,7 +603,7 @@ void GSimulation :: start()
   {   
    ts0 += time.start(); 
 
-    get_forces(n);
+    get_acceleration(n);
 
     energy = updateParticles(n, dt);
     _kenergy = 0.5 * energy; 
