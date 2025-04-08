@@ -1,16 +1,18 @@
 #include "Loop.h"
 #include "defs.h"
+#include "kernel.cuh"
 #include <string>
 #include <SDL.h>
 #include <SDL_render.h>
 #include <imgui.h>
 #include <imgui_impl_sdl2.h>
 #include <imgui_impl_sdlrenderer2.h>
+#include <cuda_runtime.h>
 using namespace std;
 
 Loop::Loop()
     : window(nullptr), renderer(nullptr), imguiContext(nullptr), imguiInit(false), imguiInitRender(false), 
-    exit(false), lastTime(0), deltaTime(0.0f) {
+    exit(false), lastTime(0), deltaTime(0.0f), isMousePressed(false), lastMouseX(0), lastMouseY(0) {
 
     // Window
     windowTitle = "Simulacion de fluidos - Laura Wang Qiu";
@@ -28,12 +30,10 @@ Loop::Loop()
     particleCol.g = 255;
     particleCol.b = 255;
     particleCol.a = 255;
-
     // Particles Time Alive
     particleTimeLeft = 1.0f;
 
-    // Number of particles to generate
-    numParticlesToGen = 10;
+    brushSize = 1;
 }
 
 Loop::~Loop() {
@@ -126,22 +126,21 @@ void Loop::handleEvents() {
             default: break;
             }
             break;
-            case SDL_MOUSEMOTION:
-            {
-                int mouseX = event.motion.x;
-                int mouseY = event.motion.y;
-
-                for (int i = 0; i < numParticlesToGen; ++i) {
-                    Particle p;
-                    p.posX = mouseX;
-                    p.posY = mouseY;
-                    p.velX = (rand() % 100 - 50) / 50.0f;
-                    p.velY = (rand() % 100 - 50) / 50.0f;
-                    p.color = particleCol;
-                    p.timeLeft = particleTimeLeft;
-                    particles.push_back(p);
-                }
+        case SDL_MOUSEBUTTONDOWN:
+            if (event.button.button == SDL_BUTTON_LEFT) {
+                isMousePressed = true;
+                lastMouseX = event.button.x;
+                lastMouseY = event.button.y;
             }
+            break;
+        case SDL_MOUSEBUTTONUP:
+            if (event.button.button == SDL_BUTTON_LEFT) {
+                isMousePressed = false;
+            }
+            break;
+        case SDL_MOUSEMOTION:
+            lastMouseX = event.motion.x;
+            lastMouseY = event.motion.y;
             break;
         case SDL_QUIT: quit(); break;
         default: break;
@@ -150,18 +149,38 @@ void Loop::handleEvents() {
 }
 
 void Loop::update() {
-    for (auto it = particles.begin(); it != particles.end();) {
-        it->posX += it->velX;
-        it->posY += it->velY;
-        it->timeLeft -= deltaTime;
+    if (isMousePressed) {
+        int centerX = lastMouseX;
+        int centerY = lastMouseY;
 
-        if (it->timeLeft <= 0)
-            it = particles.erase(it);
-        else ++it;
+        int radius = brushSize / 2;
+        int radiusSquared = radius * radius;
+
+        for (int y = -radius; y <= radius; ++y) {
+            for (int x = -radius; x <= radius; ++x) {
+                if (x * x + y * y <= radiusSquared) {
+                    Particle p;
+                    p.posX = centerX + x;
+                    p.posY = centerY + y;
+                    p.velX = 0.0f;
+                    p.velY = 0.0f;
+                    p.color = particleCol;
+                    p.timeLeft = particleTimeLeft;
+
+                    particles.push_back(p);
+                }
+            }
+        }
     }
+
+    updateParticles_kernel(particles.data(), (int)particles.size(), deltaTime);
 }
 
-void Loop::refresh() { }
+void Loop::refresh() {
+    particles.erase(
+        std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.timeLeft <= 0; }),
+        particles.end());
+}
 
 void Loop::render() {
     if (renderer != nullptr) {
@@ -188,15 +207,15 @@ void Loop::quit() { exit = true; }
 void Loop::renderSimulation() {
     for (auto it = particles.begin(); it != particles.end(); ++it) {
         SDL_SetRenderDrawColor(renderer, it->color.r, it->color.g, it->color.b, it->color.a);
-        SDL_RenderDrawPoint(renderer, it->posX, it->posY);
+        SDL_RenderDrawPoint(renderer, (int)it->posX, (int)it->posY);
     }
 }
 
 void Loop::renderInterface() {
     //ImGui::ShowDemoWindow();
     
-    ImGui::SetNextWindowPos(ImVec2(windowWidth - windowWidth / 4, 0), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2(windowWidth / 4, windowHeight), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2((float)windowWidth - windowWidth / 4, 0), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowSize(ImVec2((float)windowWidth / 4, (float)windowHeight), ImGuiCond_FirstUseEver);
 
     ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
     ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
@@ -214,11 +233,6 @@ void Loop::renderInterface() {
 
     ImGui::Separator();
 
-    ImGui::Text("Number Particles To Generate");
-    ImGui::SliderInt("  ", &numParticlesToGen, 1, 10, "%d particle/s");
-
-    ImGui::Separator();
-
     ImGui::Text("Particles Color");
     static float pColor[4] = {particleCol.r / 255.0f, particleCol.g / 255.0f, particleCol.b / 255.0f,
                               particleCol.a / 255.0f};
@@ -228,6 +242,11 @@ void Loop::renderInterface() {
         particleCol.b = static_cast<Uint8>(pColor[2] * 255);
         particleCol.a = static_cast<Uint8>(pColor[3] * 255);
     }
+
+    ImGui::Separator();
+
+    ImGui::Text("Brush Size");
+    ImGui::SliderInt("  ", &brushSize, 1, 10, "%d");
 
     ImGui::Separator();
 

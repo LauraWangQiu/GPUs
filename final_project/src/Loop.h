@@ -25,6 +25,10 @@ private:
     Uint32 lastTime;    // Time from last time
     float deltaTime;    // Time from last frame
 
+    bool isMousePressed;    // If left click of mouse is pressed
+    int lastMouseX;         // Last mouse position x
+    int lastMouseY;         // Last mouse position y
+
     /**
     * @brief Finishes the main loop establishing "exit" boolean to false value
     */
@@ -53,7 +57,7 @@ private:
     float particleTimeLeft;          // Particles alive time
     std::vector<Particle> particles; // All particles
 
-    int numParticlesToGen;           // Number of particles to generate at a time
+    int brushSize;  // Diameter which determines the quantity of particles
 
     /**
     * @brief Renders simulation

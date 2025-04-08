@@ -1,6 +1,7 @@
 #include <cuda_runtime.h>
 #include <device_launch_parameters.h>
+#include "utils.h"
 
-__global__ void addKernel(int* c, const int* a, const int* b);
+__global__ void updateParticles(Particle* particles, int numParticles, float deltaTime);
 
-cudaError_t addWithCuda(int* c, const int* a, const int* b, unsigned int size);
+void updateParticles_kernel(Particle* particles, int numParticles, float deltaTime);
