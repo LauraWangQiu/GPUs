@@ -1,4 +1,6 @@
 #pragma once
+#include "utils.h"
+#include <vector>
 
 struct SDL_Window;
 struct SDL_Renderer;
@@ -9,6 +11,9 @@ struct ImGuiContext;
 */
 class Loop {
 private:
+    const char* windowTitle;  // Window title
+    int windowWidth;          // Window width
+    int windowHeight;         // Window height
     SDL_Window* window;       // Reference to the SDL Window
     SDL_Renderer* renderer;   // Reference to the graphics interface
 
@@ -16,7 +21,9 @@ private:
     bool imguiInit;               // Flag to check if ImGui is initialized
     bool imguiInitRender;         // Flag to check if ImGui Renderer is initialized
 
-    bool exit;   // Condition value for the continuous execution of the main loop
+    bool exit;          // Condition value for the continuous execution of the main loop
+    Uint32 lastTime;    // Time from last time
+    float deltaTime;    // Time from last frame
 
     /**
     * @brief Finishes the main loop establishing "exit" boolean to false value
@@ -39,6 +46,24 @@ private:
     * @brief Renders on screen the current alive entities
     */
     void render();
+
+private:
+    Color backgroundCol;             // Background color
+    Color particleCol;               // Particles color
+    float particleTimeLeft;          // Particles alive time
+    std::vector<Particle> particles; // All particles
+
+    int numParticlesToGen;           // Number of particles to generate at a time
+
+    /**
+    * @brief Renders simulation
+    */
+    void renderSimulation();
+
+    /**
+    * @brief Renders interface
+    */
+    void renderInterface();
 
 public:
     /**

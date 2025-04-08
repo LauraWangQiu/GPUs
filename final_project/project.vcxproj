@@ -118,6 +118,7 @@
     <ClInclude Include="src\defs.h" />
     <ClInclude Include="src\kernel.cuh" />
     <ClInclude Include="src\Loop.h" />
+    <ClInclude Include="src\utils.h" />
   </ItemGroup>
   <ItemGroup>
     <CudaCompile Include="src\kernel.cu" />
