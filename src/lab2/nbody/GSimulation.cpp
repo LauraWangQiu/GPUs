@@ -362,7 +362,7 @@ real_type GSimulation::updateParticles_kernel(int n, real_type dt) {
                                 (vel_x[i] * vel_x[i] +
                                  vel_y[i] * vel_y[i] +
                                  vel_z[i] * vel_z[i]); // 7flops
-      // accumulate energy like atomic
+      // reductionAtomics1
       sycl::atomic_ref<float, sycl::memory_order::relaxed, sycl::memory_scope::device, sycl::access::address_space::global_space> atomic_energy(energy_acc[0]);
       atomic_energy.fetch_add(kinetic_energy);
     });
