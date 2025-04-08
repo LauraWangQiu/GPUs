@@ -23,6 +23,9 @@
 
 #include <sycl/sycl.hpp>
 
+#define SoA
+#define GPU
+
 GSimulation ::GSimulation() {
   std::cout << "===============================" << std::endl;
   std::cout << " Initialize Gravity Simulation" << std::endl;
@@ -32,13 +35,21 @@ GSimulation ::GSimulation() {
   set_sfreq(1);
 }
 
-GSimulation ::~GSimulation() { delete particles; /*delete particlesGPU;*/ }
+GSimulation ::~GSimulation() {
+#ifdef AoS
+  delete particles;
+#elif defined SoA
+  delete particlesSoA;
+#endif
+}
 
-GSimulation ::init(int n) {
+void GSimulation ::init(int n) {
   // allocate particles
+#ifdef AoS
   particles = new ParticleAoS[n];
-  // particlesGPU = new ParticleSoA[n];
-
+#elif defined SoA
+  particlesSoA = new ParticleSoA(n);
+#endif
   init_pos();
   init_vel();
   init_acc();
@@ -55,12 +66,15 @@ void GSimulation ::init_pos() {
   std::uniform_real_distribution<real_type> unif_d(0, 1.0);
 
   for (int i = 0; i < get_npart(); ++i) {
+#ifdef AoS
     particles[i].pos[0] = unif_d(gen);
     particles[i].pos[1] = unif_d(gen);
     particles[i].pos[2] = unif_d(gen);
-    // particlesGPU[i].pos_x = unif_d(gen);
-    // particlesGPU[i].pos_y = unif_d(gen);
-    // particlesGPU[i].pos_z = unif_d(gen);
+#elif defined SoA
+    (*particlesSoA).pos_x[i] = unif_d(gen);
+    (*particlesSoA).pos_y[i] = unif_d(gen);
+    (*particlesSoA).pos_z[i] = unif_d(gen);
+#endif
   }
 }
 
@@ -70,23 +84,29 @@ void GSimulation ::init_vel() {
   std::uniform_real_distribution<real_type> unif_d(-1.0, 1.0);
 
   for (int i = 0; i < get_npart(); ++i) {
+#ifdef AoS
     particles[i].vel[0] = unif_d(gen) * 1.0e-3f;
     particles[i].vel[1] = unif_d(gen) * 1.0e-3f;
     particles[i].vel[2] = unif_d(gen) * 1.0e-3f;
-    // particlesGPU[i].vel_x = unif_d(gen) * 1.0e-3f;
-    // particlesGPU[i].vel_y = unif_d(gen) * 1.0e-3f;
-    // particlesGPU[i].vel_z = unif_d(gen) * 1.0e-3f;
+#elif defined SoA
+    (*particlesSoA).vel_x[i] = unif_d(gen) * 1.0e-3f;
+    (*particlesSoA).vel_y[i] = unif_d(gen) * 1.0e-3f;
+    (*particlesSoA).vel_z[i] = unif_d(gen) * 1.0e-3f;
+#endif
   }
 }
 
 void GSimulation ::init_acc() {
   for (int i = 0; i < get_npart(); ++i) {
+#ifdef AoS
     particles[i].acc[0] = 0.f;
     particles[i].acc[1] = 0.f;
     particles[i].acc[2] = 0.f;
-    // particlesGPU[i].acc_x = 0.f;
-    // particlesGPU[i].acc_y = 0.f;
-    // particlesGPU[i].acc_z = 0.f;
+#elif defined SoA
+    (*particlesSoA).acc_x[i] = 0.f;
+    (*particlesSoA).acc_y[i] = 0.f;
+    (*particlesSoA).acc_z[i] = 0.f;
+#endif
   }
 }
 
@@ -97,8 +117,11 @@ void GSimulation ::init_mass() {
   std::uniform_real_distribution<real_type> unif_d(0.0, 1.0);
 
   for (int i = 0; i < get_npart(); ++i) {
+#ifdef AoS
     particles[i].mass = n * unif_d(gen);
-    // particlesGPU[i].mass = n * unif_d(gen);
+#elif defined SoA
+    (*particlesSoA).mass[i] = n * unif_d(gen);
+#endif
   }
 }
 
@@ -110,89 +133,127 @@ void GSimulation ::get_acceleration(int n) {
 
   for (i = 0; i < n; i++) // update acceleration
   {
+#ifdef AoS
     real_type ax_i = particles[i].acc[0];
     real_type ay_i = particles[i].acc[1];
     real_type az_i = particles[i].acc[2];
+#elif defined SoA
+    real_type ax_i = (*particlesSoA).acc_x[i];
+    real_type ay_i = (*particlesSoA).acc_y[i];
+    real_type az_i = (*particlesSoA).acc_z[i];
+#endif
     for (j = 0; j < n; j++) {
       real_type dx, dy, dz;
       real_type distanceSqr = 0.0f;
       real_type distanceInv = 0.0f;
-
+#ifdef AoS
       dx = particles[j].pos[0] - particles[i].pos[0]; // 1flop
       dy = particles[j].pos[1] - particles[i].pos[1]; // 1flop
       dz = particles[j].pos[2] - particles[i].pos[2]; // 1flop
+#elif defined SoA
+      dx = (*particlesSoA).pos_x[j] - (*particlesSoA).pos_x[i]; // 1flop
+      dy = (*particlesSoA).pos_y[j] - (*particlesSoA).pos_y[i]; // 1flop
+      dz = (*particlesSoA).pos_z[j] - (*particlesSoA).pos_z[i]; // 1flop
+#endif
 
       distanceSqr = dx * dx + dy * dy + dz * dz + softeningSquared; // 6flops
       distanceInv = 1.0f / sqrtf(distanceSqr); // 1div+1sqrt
-
+#ifdef AoS
       ax_i += dx * G * particles[j].mass * distanceInv * distanceInv *
               distanceInv; // 6flops
       ay_i += dy * G * particles[j].mass * distanceInv * distanceInv *
               distanceInv; // 6flops
       az_i += dz * G * particles[j].mass * distanceInv * distanceInv *
               distanceInv; // 6flops
+#elif defined SoA
+      ax_i += dx * G * (*particlesSoA).mass[j] * distanceInv * distanceInv *
+              distanceInv; // 6flops
+      ay_i += dy * G * (*particlesSoA).mass[j] * distanceInv * distanceInv *
+              distanceInv; // 6flops
+      az_i += dz * G * (*particlesSoA).mass[j] * distanceInv * distanceInv *
+              distanceInv; // 6flops
+#endif
     }
+
+#ifdef AoS
     particles[i].acc[0] = ax_i;
     particles[i].acc[1] = ay_i;
     particles[i].acc[2] = az_i;
+#elif defined SoA
+    (*particlesSoA).acc_x[i] = ax_i;
+    (*particlesSoA).acc_y[i] = ay_i;
+    (*particlesSoA).acc_z[i] = az_i;
+#endif
   }
 }
 
-// void GSimulation ::get_acceleration(int n) {
-//   const float softeningSquared = 1e-3f;
-//   const float G = 6.67259e-11f;
+#ifdef GPU
+void GSimulation ::get_acceleration_kernel(int n) {
+  const float softeningSquared = 1e-3f;
+  const float G = 6.67259e-11f;
 
-//   sycl::queue q;
+  sycl::queue q;
 
-//   sycl::buffer<real_type, 1> pos_x_buf(particlesGPU.pos_x,
-//   sycl::range<1>(n)); sycl::buffer<real_type, 1>
-//   pos_y_buf(particlesGPU.pos_y, sycl::range<1>(n)); sycl::buffer<real_type,
-//   1> pos_z_buf(particlesGPU.pos_z, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> acc_x_buf(particlesGPU.acc_x,
-//   sycl::range<1>(n)); sycl::buffer<real_type, 1>
-//   acc_y_buf(particlesGPU.acc_y, sycl::range<1>(n)); sycl::buffer<real_type,
-//   1> acc_z_buf(particlesGPU.acc_z, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> mass_buf(particlesGPU.mass, sycl::range<1>(n));
+#ifdef AoS
+  sycl::buffer<real_type, 1> pos_x_buf(&particles->pos[0], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_y_buf(&particles->pos[1], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_z_buf(&particles->pos[2], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_x_buf(&particles->acc[0], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_y_buf(&particles->acc[1], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_z_buf(&particles->acc[2], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> mass_buf (&particles->mass  , sycl::range<1>(n));
+#elif defined SoA
+  sycl::buffer<real_type, 1> pos_x_buf(particlesSoA->pos_x, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_y_buf(particlesSoA->pos_y, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_z_buf(particlesSoA->pos_z, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_x_buf(particlesSoA->acc_x, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_y_buf(particlesSoA->acc_y, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_z_buf(particlesSoA->acc_z, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> mass_buf (particlesSoA->mass , sycl::range<1>(n));
+#endif
 
-//   q.submit([&](sycl::handler &h) {
-//     auto pos_x = pos_x_buf.get_access<sycl::access::mode::read>(h);
-//     auto pos_y = pos_y_buf.get_access<sycl::access::mode::read>(h);
-//     auto pos_z = pos_z_buf.get_access<sycl::access::mode::read>(h);
-//     auto acc_x = acc_x_buf.get_access<sycl::access::mode::write>(h);
-//     auto acc_y = acc_y_buf.get_access<sycl::access::mode::write>(h);
-//     auto acc_z = acc_z_buf.get_access<sycl::access::mode::write>(h);
-//     auto mass = mass_buf.get_access<sycl::access::mode::read>(h);
+  q.submit([&](sycl::handler &h) {
+    auto pos_x = pos_x_buf.get_access<sycl::access::mode::read>(h);
+    auto pos_y = pos_y_buf.get_access<sycl::access::mode::read>(h);
+    auto pos_z = pos_z_buf.get_access<sycl::access::mode::read>(h);
+    auto acc_x = acc_x_buf.get_access<sycl::access::mode::write>(h);
+    auto acc_y = acc_y_buf.get_access<sycl::access::mode::write>(h);
+    auto acc_z = acc_z_buf.get_access<sycl::access::mode::write>(h);
+    auto mass  = mass_buf .get_access<sycl::access::mode::read>(h);
 
-//     h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> i) { // update
-//     acceleration
-//       // acceleration always initializes to 0, there is no need to access
-//       particle value real_type ax_i = 0.0f; real_type ay_i = 0.0f; real_type
-//       az_i = 0.0f; for (int j = 0; j < n; j++) {
-//         real_type dx, dy, dz;
-//         real_type distanceSqr = 0.0f;
-//         real_type distanceInv = 0.0f;
-//         real_type factor;
+    h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> i) { // update acceleration
+      // acceleration always initializes to 0, there is no need to access particle value
+      real_type ax_i = 0.0f;
+      real_type ay_i = 0.0f;
+      real_type az_i = 0.0f;
 
-//         dx = pos_x[j] - pos_x[i]; // 1flop
-//         dy = pos_y[j] - pos_y[i]; // 1flop
-//         dz = pos_z[j] - pos_z[i]; // 1flop
+      for (int j = 0; j < n; j++) {
+        real_type dx, dy, dz;
+        real_type distanceSqr = 0.0f;
+        real_type distanceInv = 0.0f;
+        real_type factor;
 
-//         distanceSqr = dx * dx + dy * dy + dz * dz + softeningSquared; //
-//         6flops distanceInv = 1.0f / sycl::sqrt(distanceSqr); // 1div+1sqrt
+        dx = pos_x[j] - pos_x[i]; // 1flop
+        dy = pos_y[j] - pos_y[i]; // 1flop
+        dz = pos_z[j] - pos_z[i]; // 1flop
 
-//         factor = G * mass[j] * distanceInv * distanceInv * distanceInv;
+        distanceSqr = dx * dx + dy * dy + dz * dz + softeningSquared; // 6flops
+        distanceInv = 1.0f / sycl::sqrt(distanceSqr); // 1div+1sqrt
 
-//         ax_i += dx * factor;
-//         ay_i += dy * factor;
-//         az_i += dz * factor;
-//       }
+        factor = G * mass[j] * distanceInv * distanceInv * distanceInv;
 
-//       acc_x[i] = ax_i; // 6flops
-//       acc_y[i] = ay_i; // 6flops
-//       acc_z[i] = az_i; // 6flops
-//     });
-//   }).wait();
-// }
+        ax_i += dx * factor;
+        ay_i += dy * factor;
+        az_i += dz * factor;
+      }
+
+      acc_x[i] = ax_i; // 6flops
+      acc_y[i] = ay_i; // 6flops
+      acc_z[i] = az_i; // 6flops
+    });
+  }).wait();
+}
+#endif
 
 real_type GSimulation ::updateParticles(int n, real_type dt) {
   int i;
@@ -200,6 +261,7 @@ real_type GSimulation ::updateParticles(int n, real_type dt) {
 
   for (i = 0; i < n; ++i) // update position
   {
+#ifdef AoS
     particles[i].vel[0] += particles[i].acc[0] * dt; // 2flops
     particles[i].vel[1] += particles[i].acc[1] * dt; // 2flops
     particles[i].vel[2] += particles[i].acc[2] * dt; // 2flops
@@ -216,69 +278,101 @@ real_type GSimulation ::updateParticles(int n, real_type dt) {
               (particles[i].vel[0] * particles[i].vel[0] +
                particles[i].vel[1] * particles[i].vel[1] +
                particles[i].vel[2] * particles[i].vel[2]); // 7flops
+#elif defined SoA
+    (*particlesSoA).vel_x[i] += (*particlesSoA).acc_x[i] * dt; // 2flops
+    (*particlesSoA).vel_y[i] += (*particlesSoA).acc_y[i] * dt; // 2flops
+    (*particlesSoA).vel_z[i] += (*particlesSoA).acc_z[i] * dt; // 2flops
+
+    (*particlesSoA).pos_x[i] += (*particlesSoA).vel_x[i] * dt; // 2flops
+    (*particlesSoA).pos_y[i] += (*particlesSoA).vel_y[i] * dt; // 2flops
+    (*particlesSoA).pos_z[i] += (*particlesSoA).vel_z[i] * dt; // 2flops
+
+    (*particlesSoA).acc_x[i] = 0.;
+    (*particlesSoA).acc_y[i] = 0.;
+    (*particlesSoA).acc_z[i] = 0.;
+
+    energy += (*particlesSoA).mass[i] *
+              ((*particlesSoA).vel_x[i] * (*particlesSoA).vel_x[i] +
+               (*particlesSoA).vel_y[i] * (*particlesSoA).vel_y[i] +
+               (*particlesSoA).vel_z[i] * (*particlesSoA).vel_z[i]); // 7flops
+#endif
   }
   return energy;
 }
 
-// real_type GSimulation::updateParticles(int n, real_type dt) {
-//   real_type energy = 0;
+#ifdef GPU
+real_type GSimulation::updateParticles_kernel(int n, real_type dt) {
+  real_type energy = 0;
 
-//   sycl::queue q;
+  sycl::queue q;
 
-//   sycl::buffer<real_type, 1> pos_x_buf(particlesGPU.pos_x, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> pos_y_buf(particlesGPU.pos_y, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> pos_z_buf(particlesGPU.pos_z, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> vel_x_buf(particlesGPU.vel_x, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> vel_y_buf(particlesGPU.vel_y, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> vel_z_buf(particlesGPU.vel_z, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> acc_x_buf(particlesGPU.acc_x, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> acc_y_buf(particlesGPU.acc_y, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> acc_z_buf(particlesGPU.acc_z, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> mass_buf(particlesGPU.mass, sycl::range<1>(n));
-//   sycl::buffer<real_type, 1> energy_buf(&energy, sycl::range<1>(1));
+#ifdef AoS
+  sycl::buffer<real_type, 1> pos_x_buf(&particles->pos[0], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_y_buf(&particles->pos[1], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_z_buf(&particles->pos[2], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> vel_x_buf(&particles->vel[0], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> vel_y_buf(&particles->vel[1], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> vel_z_buf(&particles->vel[2], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_x_buf(&particles->acc[0], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_y_buf(&particles->acc[1], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_z_buf(&particles->acc[2], sycl::range<1>(n));
+  sycl::buffer<real_type, 1> mass_buf (&particles->mass,   sycl::range<1>(n));
+  sycl::buffer<real_type, 1> energy_buf(&energy,          sycl::range<1>(1));
+#elif defined SoA
+  sycl::buffer<real_type, 1> pos_x_buf(particlesSoA->pos_x, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_y_buf(particlesSoA->pos_y, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> pos_z_buf(particlesSoA->pos_z, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> vel_x_buf(particlesSoA->vel_x, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> vel_y_buf(particlesSoA->vel_y, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> vel_z_buf(particlesSoA->vel_z, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_x_buf(particlesSoA->acc_x, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_y_buf(particlesSoA->acc_y, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> acc_z_buf(particlesSoA->acc_z, sycl::range<1>(n));
+  sycl::buffer<real_type, 1> mass_buf (particlesSoA->mass,  sycl::range<1>(n));
+  sycl::buffer<real_type, 1> energy_buf(&energy          ,  sycl::range<1>(1));
+#endif
 
-//   q.submit([&](sycl::handler &h) { // update position
-//     auto pos_x = pos_x_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto pos_y = pos_y_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto pos_z = pos_z_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto vel_x = vel_x_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto vel_y = vel_y_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto vel_z = vel_z_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto acc_x = acc_x_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto acc_y = acc_y_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto acc_z = acc_z_buf.get_access<sycl::access::mode::read_write>(h);
-//     auto mass = mass_buf.get_access<sycl::access::mode::read>(h);
-//     auto energy_acc = energy_buf.get_access<sycl::access::mode::atomic>(h);
+  q.submit([&](sycl::handler &h) { // update position
+    auto pos_x = pos_x_buf.get_access<sycl::access::mode::read_write>(h);
+    auto pos_y = pos_y_buf.get_access<sycl::access::mode::read_write>(h);
+    auto pos_z = pos_z_buf.get_access<sycl::access::mode::read_write>(h);
+    auto vel_x = vel_x_buf.get_access<sycl::access::mode::read_write>(h);
+    auto vel_y = vel_y_buf.get_access<sycl::access::mode::read_write>(h);
+    auto vel_z = vel_z_buf.get_access<sycl::access::mode::read_write>(h);
+    auto acc_x = acc_x_buf.get_access<sycl::access::mode::read_write>(h);
+    auto acc_y = acc_y_buf.get_access<sycl::access::mode::read_write>(h);
+    auto acc_z = acc_z_buf.get_access<sycl::access::mode::read_write>(h);
+    auto mass  = mass_buf .get_access<sycl::access::mode::read>(h);
+    auto energy_acc = energy_buf.get_access<sycl::access::mode::read_write>(h);
 
-//     h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> i) {
-//       vel_x[i] += acc_x[i] * dt; // 2flops
-//       vel_y[i] += acc_y[i] * dt; // 2flops
-//       vel_z[i] += acc_z[i] * dt; // 2flops
+    h.parallel_for(sycl::range<1>(n), [=](sycl::id<1> i) {
+      vel_x[i] += acc_x[i] * dt; // 2flops
+      vel_y[i] += acc_y[i] * dt; // 2flops
+      vel_z[i] += acc_z[i] * dt; // 2flops
 
-//       pos_x[i] += vel_x[i] * dt; // 2flops
-//       pos_y[i] += vel_y[i] * dt; // 2flops
-//       pos_z[i] += vel_z[i] * dt; // 2flops
+      pos_x[i] += vel_x[i] * dt; // 2flops
+      pos_y[i] += vel_y[i] * dt; // 2flops
+      pos_z[i] += vel_z[i] * dt; // 2flops
 
-//       acc_x[i] = 0.;
-//       acc_y[i] = 0.;
-//       acc_z[i] = 0.;
+      acc_x[i] = 0.;
+      acc_y[i] = 0.;
+      acc_z[i] = 0.;
 
-//       real_type kinetic_energy = mass[i] * 
-//                                 (vel_x[i] * vel_x[i] +
-//                                  vel_y[i] * vel_y[i] +
-//                                  vel_z[i] * vel_z[i]); // 7flops
-//       // accumulate energy like atomic
-//       sycl::atomic_ref<real_type, sycl::memory_order::relaxed,
-//                                   sycl::memory_scope::device,
-//                                   sycl::access::address_space::global_space>
-//       atomic_energy(energy_acc[0]);
-//       atomic_energy.fetch_add(kinetic_energy);
-//     });
-//   }).wait();
-//   // read energy value
-//   auto energy_host = energy_buf.get_access<sycl::access::mode::read>();
-//   return energy_host[0];
-// }
+      real_type kinetic_energy = mass[i] * 
+                                (vel_x[i] * vel_x[i] +
+                                 vel_y[i] * vel_y[i] +
+                                 vel_z[i] * vel_z[i]); // 7flops
+      // accumulate energy like atomic
+      sycl::atomic_ref<float, sycl::memory_order::relaxed, sycl::memory_scope::device, sycl::access::address_space::global_space> atomic_energy(energy_acc[0]);
+      atomic_energy.fetch_add(kinetic_energy);
+    });
+  }).wait();
+
+  // read energy value
+  auto energy_host = energy_buf.get_access<sycl::access::mode::read>();
+  return energy_host[0];
+}
+#endif
 
 void GSimulation ::start() {
   real_type energy;
@@ -303,9 +397,17 @@ void GSimulation ::start() {
   for (int s = 1; s <= get_nsteps(); ++s) {
     ts0 += time.start();
 
+#ifdef GPU
+    get_acceleration_kernel(n);
+#else
     get_acceleration(n);
+#endif
 
+#ifdef GPU
+    energy = updateParticles_kernel(n, dt);
+#else
     energy = updateParticles(n, dt);
+#endif
     _kenergy = 0.5 * energy;
 
     ts1 += time.stop();

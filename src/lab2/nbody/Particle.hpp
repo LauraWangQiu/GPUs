@@ -46,18 +46,30 @@ public:
 
 struct ParticleSoA {
 public:
-  ParticleSoA() { init(); }
-  void init() {
-    pos_x = NULL;
-    pos_y = NULL;
-    pos_z = NULL;
-    vel_x = NULL;
-    vel_y = NULL;
-    vel_z = NULL;
-    acc_x = NULL;
-    acc_y = NULL;
-    acc_z = NULL;
-    mass  = NULL;
+  ParticleSoA(int n) { init(n); }
+  ~ParticleSoA() {
+    delete[] pos_x;
+    delete[] pos_y;
+    delete[] pos_z;
+    delete[] vel_x;
+    delete[] vel_y;
+    delete[] vel_z;
+    delete[] acc_x;
+    delete[] acc_y;
+    delete[] acc_z;
+    delete[] mass;
+  }
+  void init(int n) {
+    pos_x = new real_type[n];
+    pos_y = new real_type[n];
+    pos_z = new real_type[n];
+    vel_x = new real_type[n];
+    vel_y = new real_type[n];
+    vel_z = new real_type[n];
+    acc_x = new real_type[n];
+    acc_y = new real_type[n];
+    acc_z = new real_type[n];
+    mass  = new real_type[n];
   }
   real_type *pos_x, *pos_y, *pos_z;
   real_type *vel_x, *vel_y, *vel_z;

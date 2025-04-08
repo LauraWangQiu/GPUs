@@ -36,14 +36,14 @@ public:
   GSimulation();
   ~GSimulation();
 
-  void init();
+  void init(int n);
   void set_number_of_particles(int N);
   void set_number_of_steps(int N);
   void start();
 
 private:
   ParticleAoS *particles;
-  ParticleSoA *particlesGPU;
+  ParticleSoA *particlesSoA;
 
   int _npart;         // number of particles
   int _nsteps;        // number of integration steps
@@ -62,7 +62,9 @@ private:
   void init_mass();
 
   void get_acceleration(int n);
+  void get_acceleration_kernel(int n);
   real_type updateParticles(int n, real_type dt);
+  real_type updateParticles_kernel(int n, real_type dt);
 
   inline void set_npart(const int &N) { _npart = N; }
   inline int get_npart() const { return _npart; }
