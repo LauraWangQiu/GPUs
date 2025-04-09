@@ -1,6 +1,6 @@
 ﻿#include "kernel.cuh"
 
-__global__ void updateParticles(Particle* particles, int numParticles, float deltaTime) {
+__global__ void applyGravityForce(Particle* particles, int numParticles, float deltaTime, float gravityForce) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numParticles) return;
 
@@ -9,10 +9,10 @@ __global__ void updateParticles(Particle* particles, int numParticles, float del
 
     particles[idx].timeLeft -= deltaTime;
 
-    particles[idx].velY += 100.8f * deltaTime;
+    particles[idx].velY += gravityForce * deltaTime;
 }
 
-void updateParticles_kernel(Particle* particles, int numParticles, float deltaTime) {
+void updateParticles_kernels(Particle* particles, int numParticles, float deltaTime, float gravityForce) {
     Particle* d_particles;
     cudaMalloc(&d_particles, numParticles * sizeof(Particle));
 
@@ -21,7 +21,7 @@ void updateParticles_kernel(Particle* particles, int numParticles, float deltaTi
     int threadsPerBlock = 256;
     int blocksPerGrid = (numParticles + threadsPerBlock - 1) / threadsPerBlock;
 
-    updateParticles<<<blocksPerGrid, threadsPerBlock>>>(d_particles, numParticles, deltaTime);
+    applyGravityForce<<<blocksPerGrid, threadsPerBlock>>>(d_particles, numParticles, deltaTime, gravityForce);
 
     cudaMemcpy(particles, d_particles, numParticles * sizeof(Particle), cudaMemcpyDeviceToHost);
 

@@ -59,6 +59,8 @@ private:
 
     int brushSize;  // Diameter which determines the quantity of particles
 
+    float gravityForce; // Constant of gravity to apply
+
     /**
     * @brief Renders simulation
     */

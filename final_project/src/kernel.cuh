@@ -2,6 +2,6 @@
 #include <device_launch_parameters.h>
 #include "utils.h"
 
-__global__ void updateParticles(Particle* particles, int numParticles, float deltaTime);
+__global__ void applyGravityForce(Particle* particles, int numParticles, float deltaTime, float gravityForce);
 
-void updateParticles_kernel(Particle* particles, int numParticles, float deltaTime);
+void updateParticles_kernels(Particle* particles, int numParticles, float deltaTime, float gravityForce = 9.8f);

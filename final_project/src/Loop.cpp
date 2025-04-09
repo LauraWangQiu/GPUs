@@ -33,7 +33,11 @@ Loop::Loop()
     // Particles Time Alive
     particleTimeLeft = 1.0f;
 
+    // Size of pen to draw particles
     brushSize = 1;
+
+    // Forces constants
+    gravityForce = 9.8f;
 }
 
 Loop::~Loop() {
@@ -117,6 +121,10 @@ void Loop::handleEvents() {
         case SDL_WINDOWEVENT:
             switch (event.window.event) {
             case SDL_WINDOWEVENT_CLOSE: quit(); break;
+            case SDL_WINDOWEVENT_RESIZED:
+                windowWidth = event.window.data1;
+                windowHeight = event.window.data2;
+                break;
             default: break;
             }
             break;
@@ -173,7 +181,7 @@ void Loop::update() {
         }
     }
 
-    updateParticles_kernel(particles.data(), (int)particles.size(), deltaTime);
+    updateParticles_kernels(particles.data(), (int)particles.size(), deltaTime, gravityForce);
 }
 
 void Loop::refresh() {
@@ -214,8 +222,8 @@ void Loop::renderSimulation() {
 void Loop::renderInterface() {
     //ImGui::ShowDemoWindow();
     
-    ImGui::SetNextWindowPos(ImVec2((float)windowWidth - windowWidth / 4, 0), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowSize(ImVec2((float)windowWidth / 4, (float)windowHeight), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2((float)windowWidth - windowWidth / 4, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImVec2((float)windowWidth / 4, (float)windowHeight), ImGuiCond_Always);
 
     ImGui::SetNextWindowCollapsed(true, ImGuiCond_FirstUseEver);
     ImGui::Begin("Settings", nullptr, ImGuiWindowFlags_NoMove | ImGuiWindowFlags_NoResize);
@@ -224,7 +232,7 @@ void Loop::renderInterface() {
     ImGui::Text("Background Color");
     static float color[4] = {backgroundCol.r / 255.0f, backgroundCol.g / 255.0f, backgroundCol.b / 255.0f,
                              backgroundCol.a / 255.0f};
-    if (ImGui::ColorPicker4("Color", color)) {
+    if (ImGui::ColorPicker4("Color ", color)) {
         backgroundCol.r = static_cast<Uint8>(color[0] * 255);
         backgroundCol.g = static_cast<Uint8>(color[1] * 255);
         backgroundCol.b = static_cast<Uint8>(color[2] * 255);
@@ -246,12 +254,17 @@ void Loop::renderInterface() {
     ImGui::Separator();
 
     ImGui::Text("Brush Size");
-    ImGui::SliderInt("  ", &brushSize, 1, 10, "%d");
+    ImGui::SliderInt(" ", &brushSize, 1, 10, "%d");
 
     ImGui::Separator();
 
     ImGui::Text("Particle Lifetime");
-    ImGui::SliderFloat(" ", &particleTimeLeft, 0.1f, 10.0f, "%.1f seconds");
+    ImGui::SliderFloat("  ", &particleTimeLeft, 0.1f, 10.0f, "%.1f seconds");
+
+    ImGui::Separator();
+
+    ImGui::Text("Gravity Force");
+    ImGui::SliderFloat("   ", &gravityForce, -1000.0f, 1000.0f, "%.1f m/s2");
 
     ImGui::PopTextWrapPos();
 
