@@ -11,8 +11,9 @@
 using namespace std;
 
 Loop::Loop()
-    : window(nullptr), renderer(nullptr), imguiContext(nullptr), imguiInit(false), imguiInitRender(false), 
-    exit(false), lastTime(0), deltaTime(0.0f), isMousePressed(false), lastMouseX(0), lastMouseY(0) {
+    : window(nullptr), renderer(nullptr), imguiContext(nullptr), imguiInit(false), imguiInitRender(false), exit(false),
+      lastTime(0), deltaTime(0.0f), isLeftClickMousePressed(false), isRightClickMousePressed(false), lastMouseX(0),
+      lastMouseY(0) {
 
     // Window
     windowTitle = "Simulacion de fluidos - Laura Wang Qiu";
@@ -34,10 +35,10 @@ Loop::Loop()
     particleTimeLeft = 1.0f;
 
     // Size of pen to draw particles
-    brushSize = 1;
+    brushSize = 2;
 
     // Forces constants
-    gravityForce = 9.8f;
+    forces.gravityParams.gravityForce = 9.8f;
 }
 
 Loop::~Loop() {
@@ -62,7 +63,8 @@ bool Loop::init() {
     }
 
     Uint32 windowFlags = SDL_WINDOW_RESIZABLE | SDL_WINDOW_ALLOW_HIGHDPI;
-    window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowWidth, windowHeight, windowFlags);
+    window = SDL_CreateWindow(windowTitle, SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, windowWidth, windowHeight,
+                              windowFlags);
     if (window == nullptr) {
         debugLog(("SDL_CreateWindow Error: " + string(SDL_GetError())).c_str());
         return false;
@@ -136,14 +138,22 @@ void Loop::handleEvents() {
             break;
         case SDL_MOUSEBUTTONDOWN:
             if (event.button.button == SDL_BUTTON_LEFT) {
-                isMousePressed = true;
+                isLeftClickMousePressed = true;
+                lastMouseX = event.button.x;
+                lastMouseY = event.button.y;
+            }
+            else if (event.button.button == SDL_BUTTON_RIGHT) {
+                isRightClickMousePressed = true;
                 lastMouseX = event.button.x;
                 lastMouseY = event.button.y;
             }
             break;
         case SDL_MOUSEBUTTONUP:
             if (event.button.button == SDL_BUTTON_LEFT) {
-                isMousePressed = false;
+                isLeftClickMousePressed = false;
+            }
+            else if (event.button.button == SDL_BUTTON_RIGHT) {
+                isRightClickMousePressed = false;
             }
             break;
         case SDL_MOUSEMOTION:
@@ -157,37 +167,40 @@ void Loop::handleEvents() {
 }
 
 void Loop::update() {
-    if (isMousePressed) {
-        int centerX = lastMouseX;
-        int centerY = lastMouseY;
+    if (isLeftClickMousePressed) {
+        Particle p;
+        p.posX = lastMouseX;
+        p.posY = lastMouseY;
+        p.velX = 0.0f;
+        p.velY = 0.0f;
+        p.radius = brushSize / 2;
+        p.color = particleCol;
+        p.timeLeft = particleTimeLeft;
 
-        int radius = brushSize / 2;
-        int radiusSquared = radius * radius;
+        particles.push_back(p);
+    }
 
-        for (int y = -radius; y <= radius; ++y) {
-            for (int x = -radius; x <= radius; ++x) {
-                if (x * x + y * y <= radiusSquared) {
-                    Particle p;
-                    p.posX = centerX + x;
-                    p.posY = centerY + y;
-                    p.velX = 0.0f;
-                    p.velY = 0.0f;
-                    p.color = particleCol;
-                    p.timeLeft = particleTimeLeft;
-
-                    particles.push_back(p);
-                }
+    if (isRightClickMousePressed) {
+        for (auto& p : particles) {
+            float dx = p.posX - lastMouseX;
+            float dy = p.posY - lastMouseY;
+            if ((dx * dx + dy * dy) < (p.radius * p.radius)) {
+                p.timeLeft = -1;
             }
         }
     }
 
-    updateParticles_kernels(particles.data(), (int)particles.size(), deltaTime, gravityForce);
+    updateParticles_kernels(particles.data(), (int)particles.size(), deltaTime, windowWidth, windowHeight,
+                            forces, lastMouseX, lastMouseY);
 }
 
 void Loop::refresh() {
-    particles.erase(
-        std::remove_if(particles.begin(), particles.end(), [](const Particle& p) { return p.timeLeft <= 0; }),
-        particles.end());
+    particles.erase(std::remove_if(particles.begin(), particles.end(),
+                                   [this](const Particle& p) {
+                                       return p.timeLeft <= 0 || p.posX < 0 || p.posX >= windowWidth || p.posY < 0 ||
+                                           p.posY >= windowHeight;
+                                   }),
+                    particles.end());
 }
 
 void Loop::render() {
@@ -215,13 +228,21 @@ void Loop::quit() { exit = true; }
 void Loop::renderSimulation() {
     for (auto it = particles.begin(); it != particles.end(); ++it) {
         SDL_SetRenderDrawColor(renderer, it->color.r, it->color.g, it->color.b, it->color.a);
-        SDL_RenderDrawPoint(renderer, (int)it->posX, (int)it->posY);
+
+        for (int y = (int)-it->radius; y <= (int)it->radius; ++y) {
+            for (int x = (int)-it->radius; x <= (int)it->radius; ++x) {
+                int radiusSquared = it->radius * it->radius;
+                if (x * x + y * y <= radiusSquared) {
+                    SDL_RenderDrawPoint(renderer, (int)it->posX + x, (int)it->posY + y);
+                }
+            }
+        }
     }
 }
 
 void Loop::renderInterface() {
     //ImGui::ShowDemoWindow();
-    
+
     ImGui::SetNextWindowPos(ImVec2((float)windowWidth - windowWidth / 4, 0), ImGuiCond_Always);
     ImGui::SetNextWindowSize(ImVec2((float)windowWidth / 4, (float)windowHeight), ImGuiCond_Always);
 
@@ -254,17 +275,17 @@ void Loop::renderInterface() {
     ImGui::Separator();
 
     ImGui::Text("Brush Size");
-    ImGui::SliderInt(" ", &brushSize, 1, 10, "%d");
+    ImGui::SliderInt(" ", &brushSize, 2, 50, "%d");
 
     ImGui::Separator();
 
     ImGui::Text("Particle Lifetime");
-    ImGui::SliderFloat("  ", &particleTimeLeft, 0.1f, 10.0f, "%.1f seconds");
+    ImGui::SliderFloat("  ", &particleTimeLeft, 0.1f, 1000, "%.1f seconds");
 
     ImGui::Separator();
 
     ImGui::Text("Gravity Force");
-    ImGui::SliderFloat("   ", &gravityForce, -1000.0f, 1000.0f, "%.1f m/s2");
+    ImGui::SliderFloat("   ", &forces.gravityParams.gravityForce, -1000.0f, 1000.0f, "%.1f m/s2");
 
     ImGui::PopTextWrapPos();
 

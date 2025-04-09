@@ -15,6 +15,22 @@ struct Color {
 struct Particle {
     float posX, posY;   // position
     float velX, velY;   // velocity
+    float radius;       // radius
     Color color;        // color
     float timeLeft;     // time left until disappear
+};
+
+/**
+* @brief Structure to store gravity parameters
+*/
+struct GravityParams {
+    float gravityForce;
+};
+
+/**
+* @brief Structure to store different forces information
+*/
+struct Forces {
+    GravityParams gravityParams;
+    // ...
 };
