@@ -228,13 +228,11 @@ void usage(int argc, char **argv)
 
 void runTest(int argc, char **argv)
 {
-	int max_rows, max_cols, idx, index;
+	int max_rows, max_cols;
 	int *nw_matrix, *input1, *input2;
 	char *output1, *output2, *tmp1, *tmp2;
 	char string1[10], string2[10];
 	int penalty = -1;
-
-	int match, delet, insert, S;
 
 	int blosum;
 
@@ -321,74 +319,84 @@ void runTest(int argc, char **argv)
 	/********************/
 	/* Needleman-Wunsch */
 	/********************/
-	t0 = gettime();
-	/* Compute top-left matrix */
-	for (int i = 0; i < max_rows - 2; i++)
+	#pragma acc data copyin(input1[0:max_cols-1], input2[0:max_rows-1]) copy(nw_matrix[0:max_rows*max_cols])
 	{
-		for (idx = 0; idx <= i; idx++)
+		t0 = gettime();
+		
+		/* Compute top-left matrix */
+		#pragma acc parallel loop collapse(2)
+		for (int i = 0; i < max_rows - 2; i++)
 		{
-			index = (idx + 1) * max_cols + (i + 1 - idx);
-
-			if (blosum)
-				S = blosum62[input1[i - idx]][input2[idx]];
-			else if (input1[i - idx] == input2[idx])
-				S = 1;
-			else
-				S = -1;
-
-			match = nw_matrix[index - 1 - max_cols] + S;
-			delet = nw_matrix[index - 1] + penalty;
-			insert = nw_matrix[index - max_cols] + penalty;
-
-			nw_matrix[index] = MAXIMUM(match, delet, insert);
+			for (int idx = 0; idx <= i; idx++)
+			{
+				int index = (idx + 1) * max_cols + (i + 1 - idx);
+	
+				int S;
+				if (blosum)
+					S = blosum62[input1[i - idx]][input2[idx]];
+				else if (input1[i - idx] == input2[idx])
+					S = 1;
+				else
+					S = -1;
+	
+				int match = nw_matrix[index - 1 - max_cols] + S;
+				int delet = nw_matrix[index - 1] + penalty;
+				int insert = nw_matrix[index - max_cols] + penalty;
+	
+				nw_matrix[index] = MAXIMUM(match, delet, insert);
+			}
 		}
-	}
-
-	/* Compute diagonals matrix */
-	for (int i = max_rows - 2; i < max_cols - 2; i++)
-	{
-		for (idx = 0; idx <= max_rows - 2; idx++)
+		
+		/* Compute diagonals matrix */
+		#pragma acc parallel loop collapse(2)
+		for (int i = max_rows - 2; i < max_cols - 2; i++)
 		{
-			index = (idx + 1) * max_cols + (i + 1 - idx);
-
-			if (blosum)
-				S = blosum62[input1[i - idx]][input2[idx]];
-			else if (input1[i - idx] == input2[idx])
-				S = 1;
-			else
-				S = -1;
-
-			match = nw_matrix[index - 1 - max_cols] + S;
-			delet = nw_matrix[index - 1] + penalty;
-			insert = nw_matrix[index - max_cols] + penalty;
-
-			nw_matrix[index] = MAXIMUM(match, delet, insert);
+			for (int idx = 0; idx <= max_rows - 2; idx++)
+			{
+				int index = (idx + 1) * max_cols + (i + 1 - idx);
+				
+				int S;
+				if (blosum)
+					S = blosum62[input1[i - idx]][input2[idx]];
+				else if (input1[i - idx] == input2[idx])
+					S = 1;
+				else
+					S = -1;
+	
+				int match = nw_matrix[index - 1 - max_cols] + S;
+				int delet = nw_matrix[index - 1] + penalty;
+				int insert = nw_matrix[index - max_cols] + penalty;
+	
+				nw_matrix[index] = MAXIMUM(match, delet, insert);
+			}
 		}
-	}
-
-	/* Compute bottom-right matrix */
-	for (int i = max_rows - 2; i >= 0; i--)
-	{
-		for (idx = 0; idx <= i; idx++)
+	
+		/* Compute bottom-right matrix */
+		#pragma acc parallel loop collapse(2)
+		for (int i = max_rows - 2; i >= 0; i--)
 		{
-			index = (idx + max_rows - 1 - i) * max_cols + max_cols - idx - 1;
-
-			if (blosum)
-				S = blosum62[input1[max_cols - idx - 2]][input2[idx + max_rows - 2 - i]];
-			else if (input1[idx + max_rows - 2 - i] == input2[max_cols - idx - 2])
-				S = 1;
-			else
-				S = -1;
-
-			match = nw_matrix[index - 1 - max_cols] + S;
-			delet = nw_matrix[index - 1] + penalty;
-			insert = nw_matrix[index - max_cols] + penalty;
-
-			nw_matrix[index] = MAXIMUM(match, delet, insert);
+			for (int idx = 0; idx <= i; idx++)
+			{
+				int index = (idx + max_rows - 1 - i) * max_cols + max_cols - idx - 1;
+				
+				int S;
+				if (blosum)
+					S = blosum62[input1[max_cols - idx - 2]][input2[idx + max_rows - 2 - i]];
+				else if (input1[idx + max_rows - 2 - i] == input2[max_cols - idx - 2])
+					S = 1;
+				else
+					S = -1;
+	
+				int match = nw_matrix[index - 1 - max_cols] + S;
+				int delet = nw_matrix[index - 1] + penalty;
+				int insert = nw_matrix[index - max_cols] + penalty;
+	
+				nw_matrix[index] = MAXIMUM(match, delet, insert);
+			}
 		}
+	
+		t1 = gettime();
 	}
-
-	t1 = gettime();
 
 	printf("\nPerformance %f GCUPS\n", 1.0e-9 * ((max_rows - 1) * (max_cols - 1) / (t1 - t0)));
 
