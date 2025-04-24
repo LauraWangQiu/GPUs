@@ -1,6 +1,0 @@
-.vs
-*.exe
-*.pdb
-bin/*
-!bin/assets/
-tmp
