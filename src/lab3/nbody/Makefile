@@ -24,3 +24,5 @@ pgi:
 
 clean: 
 	rm -f _ *.exe
+
+# source /opt/intel/oneapi/setvars.sh

@@ -1,6 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <time.h>
+#include <sys/time.h>
 #include <math.h>
 #ifdef _OPENACC
 #include <openacc.h>
@@ -14,6 +14,7 @@ double get_time()
 	gettimeofday(&tv0, (struct timezone *)0);
 	time_ = (double)((tv0.tv_usec + (tv0.tv_sec) * 1000000));
 	time = time_ / 1000000;
+
 	return (time);
 }
 
@@ -65,7 +66,6 @@ unsigned char *readBMP(char *file_name, char header[54], int *w, int *h)
 	//*************************************
 	unsigned char *image = (unsigned char *)malloc(imagesize + 256 + width * 6); // Se reservan "imagesize+256+width*6" bytes y se devuelve un puntero a estos datos
 
-	unsigned char *tmp;
 	image += 128 + width * 3;
 	if ((n = fread(image, 1, imagesize + 1, f)) != imagesize)
 		fprintf(stderr, "File size incorrect: %d bytes read insted of %d\n", n, imagesize), exit(1);
@@ -156,12 +156,12 @@ void border(float *im, float *image_out,
 	filt[7] = -1.0;
 	filt[8] = 0.0;
 
-#pragma acc data copyin(im[0:height*width], fil[0:9]) copyout(image_out[0:height*width])
+	#pragma acc data copyin(im[0:height*width], filt[0:9]) copyout(image_out[0:height*width])
 	{
 
 		t0 = get_time();
 
-		#pragma acc parallel loop collapse(2) private(i, j, ii, jj, tmp)
+		#pragma acc parallel loop collapse(2)
 		for (i = ws2; i < height - ws2; i++)
 		{
 			for (j = ws2; j < width - ws2; j++)
@@ -203,9 +203,9 @@ int main(int argc, char **argv)
 	char header[54];
 
 	// Tener menos de 3 argumentos es incorrecto
-	if (argc < 4)
+	if (argc < 3)
 	{
-		fprintf(stderr, "Uso incorrecto de los parametros. exe  input.bmp output.bmp [cg]\n");
+		fprintf(stderr, "Uso incorrecto de los parametros. exe  input.bmp output.bmp\n");
 		exit(1);
 	}
 
@@ -219,15 +219,7 @@ int main(int argc, char **argv)
 	////////////////
 	// Filter     //
 	////////////////
-	switch (argv[3][0])
-	{
-	case 'c':
-	case 'g':
-		border(imageBW, imageOUT, height, width);
-		break;
-	default:
-		printf("Not Implemented yet!!\n");
-	}
+	border(imageBW, imageOUT, height, width);
 
 	// WRITE IMAGE
 	writeBMP(imageOUT, argv[2], header, width, height);

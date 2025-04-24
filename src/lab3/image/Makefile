@@ -3,9 +3,9 @@
 
 CC=gcc
 
-CFLAGS=-O3 -lm -lrt 
+CFLAGS=-O3 -lm -lrt -std=c99
 
-PGCC=pgcc -Minfo -fast -acc -ta=nvidia -tp=nehalem
+PGCC=nvc -fast -acc -gpu=managed -Minfo=accel
 
 NAME=image
 
@@ -16,9 +16,11 @@ host:
 
 gpu: pgi
 
-
 pgi:
 	$(PGCC) $(NAME).c -o $(NAME).pgi.exe
 
+
 clean: 
-	rm -f _ *.exe
+	rm -f __hmpp_*  *.exe
+
+# source /opt/intel/oneapi/setvars.sh

@@ -39,13 +39,15 @@ void randomizeBodies(body *data, int n)
 
 void bodyForce(body *p, float dt, int n)
 {
-	#pragma acc parallel loop collapse(2) copyin(p[0 : n]) copy(p[0 : n])
+	// CPU -> GPU -> CPU
+	#pragma acc parallel loop copy(p[0 : n])
 	for (int i = 0; i < n; i++)
 	{
 		float Fx = 0.0f;
 		float Fy = 0.0f;
 		float Fz = 0.0f;
 
+		#pragma acc loop reduction(+:Fx,Fy,Fz)
 		for (int j = 0; j < n; j++)
 		{
 			if (i != j)

@@ -44,76 +44,52 @@ char get_amino_symbol(int x)
 	{
 	case 0:
 		return ('R');
-		break;
 	case 1:
 		return ('A');
-		break;
 	case 2:
 		return ('N');
-		break;
 	case 3:
 		return ('D');
-		break;
 	case 4:
 		return ('C');
-		break;
 	case 5:
 		return ('Q');
-		break;
 	case 6:
 		return ('E');
-		break;
 	case 7:
 		return ('G');
-		break;
 	case 8:
 		return ('H');
-		break;
 	case 9:
 		return ('I');
-		break;
 	case 10:
 		return ('L');
-		break;
 	case 11:
 		return ('K');
-		break;
 	case 12:
 		return ('M');
-		break;
 	case 13:
 		return ('F');
-		break;
 	case 14:
 		return ('P');
-		break;
 	case 15:
 		return ('S');
-		break;
 	case 16:
 		return ('T');
-		break;
 	case 17:
 		return ('W');
-		break;
 	case 18:
 		return ('Y');
-		break;
 	case 19:
 		return ('V');
-		break;
 	case 20:
 		return ('B');
-		break;
 	case 21:
 		return ('Z');
-		break;
 	case 22:
 		return ('X');
-		break;
 	case 23:
 		return ('*');
-		break;
 	}
 	return ('*');
 }
@@ -124,76 +100,52 @@ int set_amino_symbol(char x)
 	{
 	case 'R':
 		return (0);
-		break;
 	case 'A':
 		return (1);
-		break;
 	case 'N':
 		return (2);
-		break;
 	case 'D':
 		return (3);
-		break;
 	case 'C':
 		return (4);
-		break;
 	case 'Q':
 		return (5);
-		break;
 	case 'E':
 		return (6);
-		break;
 	case 'G':
 		return (7);
-		break;
 	case 'H':
 		return (8);
-		break;
 	case 'I':
 		return (9);
-		break;
 	case 'L':
 		return (10);
-		break;
 	case 'K':
 		return (11);
-		break;
 	case 'M':
 		return (12);
-		break;
 	case 'F':
 		return (13);
-		break;
 	case 'P':
 		return (14);
-		break;
 	case 'S':
 		return (15);
-		break;
 	case 'T':
 		return (16);
-		break;
 	case 'W':
 		return (17);
-		break;
 	case 'Y':
 		return (18);
-		break;
 	case 'V':
 		return (19);
-		break;
 	case 'B':
 		return (20);
-		break;
 	case 'Z':
 		return (21);
-		break;
 	case 'X':
 		return (22);
-		break;
 	case '*':
 		return (23);
-		break;
 	default:
 		return (23);
 	}
@@ -218,7 +170,7 @@ int main(int argc, char **argv)
 
 void usage(int argc, char **argv)
 {
-	fprintf(stderr, "Usage: %s <max_rows><max_cols> <penalty>\n", argv[0]);
+	fprintf(stderr, "Usage: %s <max_rows> <max_cols>\n", argv[0]);
 	fprintf(stderr, "\t<max_cols><max_rows>      - x and y dimensions. x>y\n");
 	fprintf(stderr, "\n");
 	fprintf(stderr, "Testing Usage: %s 1\n", argv[0]);
@@ -319,14 +271,15 @@ void runTest(int argc, char **argv)
 	/********************/
 	/* Needleman-Wunsch */
 	/********************/
-	#pragma acc data copyin(input1[0:max_cols-1], input2[0:max_rows-1]) copy(nw_matrix[0:max_rows*max_cols])
+	#pragma acc data copyin(input1[0:max_cols], input2[0:max_rows], blosum62[0:24][0:24]) copy(nw_matrix[0:max_rows*max_cols])
 	{
 		t0 = gettime();
 		
 		/* Compute top-left matrix */
-		#pragma acc parallel loop collapse(2)
+		#pragma acc kernels loop independent
 		for (int i = 0; i < max_rows - 2; i++)
 		{
+			#pragma acc loop independent
 			for (int idx = 0; idx <= i; idx++)
 			{
 				int index = (idx + 1) * max_cols + (i + 1 - idx);
@@ -348,7 +301,7 @@ void runTest(int argc, char **argv)
 		}
 		
 		/* Compute diagonals matrix */
-		#pragma acc parallel loop collapse(2)
+		#pragma acc kernels loop independent collapse(2)
 		for (int i = max_rows - 2; i < max_cols - 2; i++)
 		{
 			for (int idx = 0; idx <= max_rows - 2; idx++)
@@ -372,9 +325,10 @@ void runTest(int argc, char **argv)
 		}
 	
 		/* Compute bottom-right matrix */
-		#pragma acc parallel loop collapse(2)
+		#pragma acc kernels loop independent
 		for (int i = max_rows - 2; i >= 0; i--)
 		{
+			#pragma acc loop independent
 			for (int idx = 0; idx <= i; idx++)
 			{
 				int index = (idx + max_rows - 1 - i) * max_cols + max_cols - idx - 1;
@@ -431,7 +385,7 @@ void runTest(int argc, char **argv)
 	int pos1 = 0;
 	int pos2 = 0;
 
-	for (int i = max_rows - 1, j = max_cols - 1; i >= 0, j >= 0;)
+	for (int i = max_rows - 1, j = max_cols - 1; /*i >= 0,*/ j >= 0;)
 	{
 		int nw, n, w, traceback;
 
@@ -453,17 +407,8 @@ void runTest(int argc, char **argv)
 			nw = w = LIMIT;
 			n = nw_matrix[(i - 1) * max_cols + j];
 		}
-		else
-		{
-		}
 
 		traceback = MAXIMUM(nw, w, n);
-		if (traceback == nw)
-			traceback = nw;
-		if (traceback == w)
-			traceback = w;
-		if (traceback == n)
-			traceback = n;
 
 		if (traceback == nw)
 		{
@@ -473,7 +418,6 @@ void runTest(int argc, char **argv)
 			j--;
 			pos1++;
 			pos2++;
-			continue;
 		}
 		else if (traceback == w)
 		{
@@ -482,7 +426,6 @@ void runTest(int argc, char **argv)
 			j--;
 			pos1++;
 			pos2++;
-			continue;
 		}
 		else if (traceback == n)
 		{
@@ -491,7 +434,6 @@ void runTest(int argc, char **argv)
 			i--;
 			pos1++;
 			pos2++;
-			continue;
 		}
 	}
 	for (int i = 0; i < pos1; i++)
