@@ -5,7 +5,7 @@ code .
 python3 -m venv venv
 source venv/bin/activate
 # Install requirements (tensorflow, matplotlib, etc)
-pip install notebook ipykernel tensorflow matplotlib
+pip install notebook ipykernel tensorflow matplotlib scipy
 python -m ipykernel install --user --name=venv --display-name "venv"
 # Select kernel in Jupyter Notebook and run kernels
 ```
